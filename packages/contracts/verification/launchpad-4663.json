@@ -1,0 +1,45 @@
+{
+  "chainId": 4663,
+  "compilerVersion": "v0.8.24+commit.e11b9ed9",
+  "input": "launchpad-4663.input.json",
+  "verified": [
+    {
+      "name": "PairVault",
+      "address": "0x08017A30DCd787Dbf8681cd50579FdbB1A6c451d",
+      "constructorArgs": ""
+    }
+  ],
+  "pending": [
+    {
+      "name": "CreatorToken",
+      "address": "0xdfe1ff3DF6fdb91B129863f8a79E202221ffE5b9",
+      "constructorArgs": "",
+      "note": "implementation created inside ComposeCurve's constructor"
+    },
+    {
+      "name": "PairDeployer",
+      "address": "0xa3a876f633b4243fa48860f0d56faf6b63724529",
+      "constructorArgs": ""
+    },
+    {
+      "name": "PairFactory",
+      "address": "0x94e271f4b53b536e867c128792b62701d9ec4f5a",
+      "constructorArgs": "000000000000000000000000f7d07942e1f8633f54f9200cb3b54d05ee60dca2000000000000000000000000bdbdf97fe07d1fb9593c0f700d38ed76174a2de30000000000000000000000001be34265bbd154109a79175ab9ecf4d3e09f9ac50000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad73000000000000000000000000a3a876f633b4243fa48860f0d56faf6b63724529"
+    },
+    {
+      "name": "ComposeCurve",
+      "address": "0x82b873c7033463da1a449aef878c6a842b437d97",
+      "constructorArgs": "000000000000000000000000f7d07942e1f8633f54f9200cb3b54d05ee60dca200000000000000000000000094e271f4b53b536e867c128792b62701d9ec4f5a000000000000000000000000f7d07942e1f8633f54f9200cb3b54d05ee60dca200000000000000000000000000000000000000000000000000000050539a3a00"
+    },
+    {
+      "name": "PairRouter",
+      "address": "0x2562c91cad2d998a6ecac4cabe9033abebb06fa3",
+      "constructorArgs": "00000000000000000000000094e271f4b53b536e867c128792b62701d9ec4f5a000000000000000000000000caf681a66d020601342297493863e78c959e5cb20000000000000000000000005fc5360d0400a0fd4f2af552add042d716f1d168"
+    },
+    {
+      "name": "CurveRouter",
+      "address": "0x48b6c19c7bf7ed9c9f14f39190ba4a67b15af259",
+      "constructorArgs": "00000000000000000000000082b873c7033463da1a449aef878c6a842b437d970000000000000000000000002562c91cad2d998a6ecac4cabe9033abebb06fa3"
+    }
+  ]
+}
