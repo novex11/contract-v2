@@ -64,6 +64,7 @@ import { HatchPattern } from "@/components/motion/hatch-pattern";
 import { OnChainVerifiedBadge } from "@/components/receipt/on-chain-verified-badge";
 import { DualLogoStack } from "@/components/launchpad/dual-logo-stack";
 import { AddressChip } from "@/components/launchpad/address-chip";
+import { VerifiedSourceChip } from "@/components/launchpad/verified-source-chip";
 import { StageProgressList, type ProgressStep } from "@/components/launchpad/stage-progress";
 import { DepositAmountField } from "@/components/launchpad/deposit-amount-field";
 import type { PairChartMetric } from "@/components/pair/pair-chart";
@@ -490,6 +491,8 @@ export default function PairDetailContent({ address }: { address: string }) {
         )}
         <AddressChip address={chain.receiptToken} label="Receipt" />
         <AddressChip address={chain.creator} label="Creator" />
+        <VerifiedSourceChip verification={meta?.verification?.vault} address={pairAddress} label="Vault" />
+        <VerifiedSourceChip verification={meta?.verification?.receipt} address={chain.receiptToken} label="Receipt" />
       </div>
 
       {/* Stats */}

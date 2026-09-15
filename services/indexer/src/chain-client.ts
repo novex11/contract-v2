@@ -112,7 +112,17 @@ export function explorerApiUrl(): string {
   return base.replace(/\/$/, "");
 }
 
-/** Submit source verification for newly launched pairs (default on). */
+/** Sourcify server used to publish launched contracts' source (default: the public instance). */
+export function sourcifyUrl(): string {
+  return (process.env.SOURCIFY_URL || "https://sourcify.dev/server").replace(/\/$/, "");
+}
+
+/** EVM chain id the indexer is following. */
+export function chainId(): number {
+  return (USE_TESTNET ? robinhoodTestnet : robinhoodChain).id;
+}
+
+/** Publish the source of every launched pair and token to Sourcify + the explorer (default on). */
 export const AUTO_VERIFY_CONTRACTS = process.env.AUTO_VERIFY_CONTRACTS !== "false";
 
 /** First block to index launchpad events from (the factory deployment block). */

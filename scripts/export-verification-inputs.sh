@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Writes explorer verification inputs (standard JSON) for the contracts the
-# PairFactory deploys at launch time: PairVault and ReceiptToken. The indexer
-# uses them to verify every newly launched pair automatically.
+# Writes source-verification inputs (standard JSON) for the contracts our
+# factories deploy at launch time: PairVault + PairShareToken (PairFactory) and
+# CreatorToken (ComposeCurve). The indexer publishes every newly launched
+# contract to Sourcify and the explorer with these.
 #
-# Re-run after changing PairVault.sol / ReceiptToken.sol or compiler settings.
+# Re-run after changing any of those contracts or the compiler settings.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="$HOME/.foundry/bin:$PATH"
@@ -16,7 +17,7 @@ mkdir -p "$OUT"
 cd "$ROOT/packages/contracts"
 forge build --no-lint >/dev/null
 
-for name in PairVault ReceiptToken; do
+for name in PairVault PairShareToken CreatorToken; do
   forge verify-contract 0x0000000000000000000000000000000000000001 "src/$name.sol:$name" \
     --verifier blockscout --show-standard-json-input > "$OUT/$name.input.json"
 done

@@ -15,6 +15,7 @@ import { PairAreaChart, type PairAreaMetric } from "@/components/pair/pair-area-
 import { TokenTradePanel } from "@/components/token/token-trade-panel";
 import { CurveCreatorFees } from "@/components/token/curve-creator-fees";
 import { AddressChip } from "@/components/launchpad/address-chip";
+import { VerifiedSourceChip } from "@/components/launchpad/verified-source-chip";
 import { DualLogoStack } from "@/components/launchpad/dual-logo-stack";
 import { Badge } from "@/components/ui/badge";
 import { cn, explorerUrl, formatUsd } from "@/lib/utils";
@@ -193,6 +194,7 @@ export default function TokenDetailContent({ address }: { address: string }) {
         <AddressChip address={token} label="Token" />
         <AddressChip address={curve.pair} label="Pair" />
         <AddressChip address={curve.creator} label="Creator" />
+        <VerifiedSourceChip verification={meta?.verification} address={token} />
       </div>
 
       {/* Bonding progress */}

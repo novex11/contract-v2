@@ -1,6 +1,17 @@
 import { parseAbi, parseAbiItem, type Address, type Log, type PublicClient } from "viem";
+import { fileURLToPath } from "node:url";
 import { createDb } from "./db.js";
-import { getPublicClient, launchpadStartBlock, composeCurveAddress } from "./chain-client.js";
+import {
+  AUTO_VERIFY_CONTRACTS,
+  chainId,
+  composeCurveAddress,
+  explorerApiUrl,
+  getPublicClient,
+  launchpadStartBlock,
+  sourcifyUrl,
+} from "./chain-client.js";
+import { createVerificationQueue, verifyCreatorToken } from "./contract-verifier.js";
+import * as verificationStore from "./verification-store.js";
 import * as launchpadStore from "./launchpad-store.js";
 import * as curveStore from "./curve-store.js";
 import { publishTokenTrade } from "./pair-live.js";
@@ -20,6 +31,7 @@ type TradeLog = Log<bigint, number, false, typeof TradeEvent>;
 type GraduatedLog = Log<bigint, number, false, typeof GraduatedEvent>;
 
 const vaultAbi = parseAbi(["function sharePrice() view returns (uint256)"]);
+const VERIFICATION_INPUTS_DIR = fileURLToPath(new URL("../verification", import.meta.url));
 
 const CHUNK = BigInt(process.env.INDEXER_LOG_CHUNK ?? 5_000);
 const POLL_MS = Number(process.env.INDEXER_POLL_MS ?? 1_500);
@@ -88,6 +100,43 @@ export function startCurveIndexer(): (() => void) | null {
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
 
+  const vlog = (m: string) => console.log(`[verifier] ${m}`);
+  // Every CreatorToken minted by the curve gets its source published
+  // (Sourcify + explorer). Restarts only retry tokens that are still missing.
+  const queueVerification = AUTO_VERIFY_CONTRACTS
+    ? createVerificationQueue<Address>(async (token, txHash) => {
+        try {
+          if (await verificationStore.isFullyVerified(db!, token)) return;
+          const r = await verifyCreatorToken(
+            client!,
+            {
+              chainId: chainId(),
+              explorerApiUrl: explorerApiUrl(),
+              sourcifyUrl: sourcifyUrl(),
+              inputsDir: VERIFICATION_INPUTS_DIR,
+              log: vlog,
+              onResult: (rec) => verificationStore.upsertVerification(db!, chainId(), rec),
+            },
+            token,
+            curve,
+            typeof txHash === "string" && txHash.startsWith("0x") ? { creationTxHash: txHash as `0x${string}` } : {},
+          );
+          vlog(`${token}: token sourcify=${r.sourcify} blockscout=${r.blockscout}`);
+        } catch (e) {
+          vlog(`${token}: ${e instanceof Error ? e.message : e}`);
+        }
+      })
+    : () => undefined;
+
+  async function queueKnownTokens() {
+    try {
+      const list = await curveStore.listTokens(db!, curveAddr, { sort: "new", limit: 10_000 });
+      for (const t of list) queueVerification(t.row.tokenAddress as Address, t.row.txHash);
+    } catch (e) {
+      vlog(`could not list tokens for verification: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
   async function pairFor(token: string): Promise<Address | null> {
     const key = token.toLowerCase();
     const cached = pairOfToken.get(key);
@@ -121,6 +170,7 @@ export function startCurveIndexer(): (() => void) | null {
     });
     pairOfToken.set(token.toLowerCase(), pair);
     console.log(`[curve-indexer] TokenCreated ${symbol} ${token} on pair ${pair}`);
+    queueVerification(token, log.transactionHash ?? undefined);
   }
 
   async function handleTrade(log: TradeLog) {
@@ -213,6 +263,7 @@ export function startCurveIndexer(): (() => void) | null {
   }
 
   console.log(`[curve-indexer] Indexing ComposeCurve ${curve}`);
+  void queueKnownTokens();
   void run();
 
   return () => {

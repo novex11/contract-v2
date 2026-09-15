@@ -75,6 +75,7 @@ export const launchPair: DocPage = {
           <Step title="Set the creator fee">1% to 5% of shares minted on other people's deposits, paid to you as shares.</Step>
           <Step title="Enter the seed and, optionally, list on a DEX">Turn on the DEX toggle to move 10–50% of your seed shares into a Uniswap v4 pool against USDG. The card shows the USDG required.</Step>
           <Step title="Launch">Approve token A, approve token B (and USDG if pooling), then one launch transaction. The success screen shows the pair, the transactions and the pool id.</Step>
+          <Step title="Source verification happens for you">Right after launch the indexer publishes the vault, share token and creator token source to Sourcify and the block explorer. The pair and token pages show a verified pill that links to the published source once it is through.</Step>
         </Steps>
       ),
     },

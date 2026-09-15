@@ -240,6 +240,21 @@ export interface LaunchpadPair {
 export interface LaunchpadPairDetail extends LaunchpadPair {
   tokenA: string;
   tokenB: string;
+  /** Source-verification state of the vault and its share token (published automatically after launch). */
+  verification?: { vault: ContractVerification; receipt: ContractVerification };
+}
+
+/** Where a launched contract's source has been published (see indexer /launchpad/verification/:address). */
+export interface ContractVerification {
+  address: string;
+  kind: "PairVault" | "PairShareToken" | "CreatorToken" | null;
+  /** True when the source is published on at least one backend. */
+  verified: boolean;
+  sourcify: boolean;
+  blockscout: boolean;
+  /** Public source page on Sourcify, when verified there. */
+  sourcifyUrl: string | null;
+  updatedAt: string | null;
 }
 
 export interface LaunchpadStats {
@@ -395,6 +410,8 @@ export interface CurveToken {
   volume24hUsd?: number;
   /** Distinct wallets holding the token (indexer estimate). */
   holders?: number;
+  /** Source-verification state of the token contract (detail endpoint only). */
+  verification?: ContractVerification;
 }
 
 export type CurveTokenSort = "new" | "mcap" | "volume";

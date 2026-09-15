@@ -332,6 +332,18 @@ export async function ensureSchema(): Promise<void> {
         )
       `;
 
+      await sql`
+        CREATE TABLE IF NOT EXISTS contract_verifications (
+          address text PRIMARY KEY,
+          chain_id numeric NOT NULL,
+          kind text NOT NULL,
+          sourcify text NOT NULL,
+          blockscout text NOT NULL,
+          error text,
+          updated_at timestamp NOT NULL DEFAULT now()
+        )
+      `;
+
       console.log("[indexer] PostgreSQL schema ready");
       return;
     } catch (err) {

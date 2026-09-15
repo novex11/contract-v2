@@ -340,3 +340,16 @@ export const indexerCursor = pgTable("indexer_cursor", {
   block: numeric("block").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ─── Source verification of launched contracts ──────────
+
+/** One row per launched contract (pair vault, share token, creator token) with the last outcome per backend. */
+export const contractVerifications = pgTable("contract_verifications", {
+  address: text("address").primaryKey(),
+  chainId: numeric("chain_id").notNull(),
+  kind: text("kind").notNull(),
+  sourcify: text("sourcify").notNull(),
+  blockscout: text("blockscout").notNull(),
+  error: text("error"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

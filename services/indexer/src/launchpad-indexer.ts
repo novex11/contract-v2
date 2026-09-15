@@ -9,10 +9,13 @@ import {
 import { getTokenByAddress } from "@compose/config";
 import { fileURLToPath } from "node:url";
 import { createDb, type Db } from "./db.js";
-import { createVerificationQueue, verifyPairContracts } from "./contract-verifier.js";
+import { createVerificationQueue, verifyPairContracts, type VerificationRecord } from "./contract-verifier.js";
+import * as verificationStore from "./verification-store.js";
 import {
   AUTO_VERIFY_CONTRACTS,
+  chainId,
   explorerApiUrl,
+  sourcifyUrl,
   getPublicClient,
   launchpadStartBlock,
   oracleAddress,
@@ -227,15 +230,27 @@ export function startLaunchpadIndexer(): (() => void) | null {
 
   const cursorId = `launchpad:${factory.toLowerCase()}`;
   const log = (m: string) => console.log(`[verifier] ${m}`);
+  const outcome = (r: VerificationRecord) => `sourcify=${r.sourcify} blockscout=${r.blockscout}`;
+  // Every launched pair gets its PairVault + PairShareToken source published
+  // (Sourcify + explorer). Restarts only retry pairs that are still missing.
   const queueVerification = AUTO_VERIFY_CONTRACTS
-    ? createVerificationQueue(async (pair) => {
+    ? createVerificationQueue<Address>(async (pair, txHash) => {
         try {
+          if (await verificationStore.isFullyVerified(db!, pair)) return;
           const result = await verifyPairContracts(
             client,
-            { explorerApiUrl: explorerApiUrl(), inputsDir: VERIFICATION_INPUTS_DIR, log },
+            {
+              chainId: chainId(),
+              explorerApiUrl: explorerApiUrl(),
+              sourcifyUrl: sourcifyUrl(),
+              inputsDir: VERIFICATION_INPUTS_DIR,
+              log,
+              onResult: (r) => verificationStore.upsertVerification(db!, chainId(), r),
+            },
             pair,
+            typeof txHash === "string" && txHash.startsWith("0x") ? { creationTxHash: txHash as `0x${string}` } : {},
           );
-          log(`${pair}: vault ${result.vault}, receipt ${result.receipt}`);
+          log(`${pair}: vault ${outcome(result.vault)}; receipt ${result.receipt.address} ${outcome(result.receipt)}`);
         } catch (e) {
           log(`${pair}: ${e instanceof Error ? e.message : e}`);
         }
@@ -258,7 +273,7 @@ export function startLaunchpadIndexer(): (() => void) | null {
         decimalsA: getTokenByAddress(row.tokenA)?.decimals ?? 18,
         decimalsB: getTokenByAddress(row.tokenB)?.decimals ?? 18,
       });
-      queueVerification(row.pairAddress as Address);
+      queueVerification(row.pairAddress as Address, row.txHash);
     }
   }
 
@@ -272,7 +287,7 @@ export function startLaunchpadIndexer(): (() => void) | null {
     });
     pairs.set(pair.toLowerCase(), info);
     console.log(`[launchpad-indexer] PairLaunched ${pair} (block ${log.blockNumber})`);
-    queueVerification(pair);
+    queueVerification(pair, log.transactionHash ?? undefined);
   }
 
   /** Chart point right after a buy/sell, read at the event's block. */

@@ -17,7 +17,8 @@ import { pairMetadataMessage, corsOrigins } from "@compose/config";
 import { startChainListener } from "./chain-listener.js";
 import { VerifyError, verifyDeposit, verifyRedeem } from "./basket-verify.js";
 import { ensurePairIndexed, startLaunchpadIndexer } from "./launchpad-indexer.js";
-import { composeCurveAddress, getPublicClient, pairFactoryAddress, vaultFactoryAddress } from "./chain-client.js";
+import { chainId, composeCurveAddress, getPublicClient, pairFactoryAddress, vaultFactoryAddress } from "./chain-client.js";
+import * as verificationStore from "./verification-store.js";
 import { startMarkToMarket } from "./mark-to-market.js";
 import {
   getVaults,
@@ -682,6 +683,9 @@ app.get("/launchpad/pair/:address", async (c) => {
   const pair = await launchpadStore.getPair(db!, addr);
   if (!pair) return c.json({ error: "Pair not found" }, 404);
   const activity = await launchpadStore.getPairActivity(db!, addr);
+  const verifications = await verificationStore.getVerifications(db!, [pair.pairAddress, pair.receiptAddress]);
+  const verificationOf = (address: string) =>
+    verificationStore.toVerificationJson(verifications.get(address.toLowerCase()) ?? null, chainId(), address);
   return c.json({
     pair: {
       pairAddress: pair.pairAddress,
@@ -708,6 +712,8 @@ app.get("/launchpad/pair/:address", async (c) => {
       numeraireTicker: pair.numeraireTicker ?? "",
       status: pair.status,
       createdAt: pair.createdAt.toISOString(),
+      /** Source-verification state of the vault and its share token (published automatically after launch). */
+      verification: { vault: verificationOf(pair.pairAddress), receipt: verificationOf(pair.receiptAddress) },
     },
     activity: {
       deposits: activity.deposits.map((d) => ({
@@ -894,11 +900,26 @@ app.get("/launchpad/token/:address", async (c) => {
   const row = await curveStore.getToken(db!, curveScope(), c.req.param("address"));
   if (!row) return c.json({ error: "Token not found" }, 404);
   const trades = await curveStore.getTrades(db!, row.tokenAddress, 50);
+  const verification = verificationStore.toVerificationJson(
+    await verificationStore.getVerification(db!, row.tokenAddress),
+    chainId(),
+    row.tokenAddress,
+  );
   return c.json(
-    { token: await tokenJson(row, true), trades: trades.map(curveStore.toTradeJson) },
+    { token: { ...(await tokenJson(row, true)), verification }, trades: trades.map(curveStore.toTradeJson) },
     200,
     { "Cache-Control": "no-store" },
   );
+});
+
+/** Source-verification status of a launched contract (pair vault, share token or creator token). */
+app.get("/launchpad/verification/:address", async (c) => {
+  if (!useDb) return c.json({ error: "DB not configured" }, 503);
+  const addr = c.req.param("address");
+  const row = await verificationStore.getVerification(db!, addr);
+  return c.json({ verification: verificationStore.toVerificationJson(row, chainId(), addr) }, 200, {
+    "Cache-Control": "no-store",
+  });
 });
 
 app.get("/launchpad/pair/:address/token", async (c) => {
