@@ -13,4 +13,4 @@ robinhood = "${ROBINHOOD_RPC_URL}"
 robinhood_testnet = "${ROBINHOOD_TESTNET_RPC_URL}"
 
 [etherscan]
-robinhood = { key = "${ETHERSCAN_API_KEY}", url = "https://explorer.robinhood.com/api" }
+robinhood = { key = "${ETHERSCAN_API_KEY}", url = "https://robinhoodchain.blockscout.com/api" }

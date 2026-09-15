@@ -235,7 +235,7 @@ export function startLaunchpadIndexer(): (() => void) | null {
             { explorerApiUrl: explorerApiUrl(), inputsDir: VERIFICATION_INPUTS_DIR, log },
             pair,
           );
-          log(`${pair}: vault ${result.vault}, receipt ${result.receipt}`);
+          log(`${pair}: vault ${result.vault}, share ${result.share}`);
         } catch (e) {
           log(`${pair}: ${e instanceof Error ? e.message : e}`);
         }

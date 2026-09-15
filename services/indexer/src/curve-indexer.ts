@@ -1,9 +1,19 @@
 import { parseAbi, parseAbiItem, type Address, type Log, type PublicClient } from "viem";
 import { createDb } from "./db.js";
-import { getPublicClient, launchpadStartBlock, composeCurveAddress } from "./chain-client.js";
+import { fileURLToPath } from "node:url";
+import {
+  AUTO_VERIFY_CONTRACTS,
+  composeCurveAddress,
+  explorerApiUrl,
+  getPublicClient,
+  launchpadStartBlock,
+} from "./chain-client.js";
+import { createVerificationQueue, verifyCreatorToken } from "./contract-verifier.js";
 import * as launchpadStore from "./launchpad-store.js";
 import * as curveStore from "./curve-store.js";
 import { publishTokenTrade } from "./pair-live.js";
+
+const VERIFICATION_INPUTS_DIR = fileURLToPath(new URL("../verification", import.meta.url));
 
 const TokenCreatedEvent = parseAbiItem(
   "event TokenCreated(address indexed token, address indexed pair, address indexed creator, address share, string name, string symbol, uint256 virtualQuote, uint256 graduationQuote)",
@@ -84,6 +94,22 @@ export function startCurveIndexer(): (() => void) | null {
 
   const curveAddr: string = curve;
   const cursorId = `curve:${curve.toLowerCase()}`;
+  const verifierLog = (m: string) => console.log(`[verifier] ${m}`);
+  const queueVerification = AUTO_VERIFY_CONTRACTS
+    ? createVerificationQueue(async (token) => {
+        try {
+          const result = await verifyCreatorToken(
+            client!,
+            { explorerApiUrl: explorerApiUrl(), inputsDir: VERIFICATION_INPUTS_DIR, log: verifierLog },
+            token,
+            curve,
+          );
+          verifierLog(`${token}: creator token ${result}`);
+        } catch (e) {
+          verifierLog(`${token}: ${e instanceof Error ? e.message : e}`);
+        }
+      })
+    : () => undefined;
   const pairOfToken = new Map<string, Address>();
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
@@ -121,6 +147,7 @@ export function startCurveIndexer(): (() => void) | null {
     });
     pairOfToken.set(token.toLowerCase(), pair);
     console.log(`[curve-indexer] TokenCreated ${symbol} ${token} on pair ${pair}`);
+    queueVerification(token);
   }
 
   async function handleTrade(log: TradeLog) {
