@@ -17,7 +17,14 @@ import { pairMetadataMessage, corsOrigins } from "@compose/config";
 import { startChainListener } from "./chain-listener.js";
 import { VerifyError, verifyDeposit, verifyRedeem } from "./basket-verify.js";
 import { ensurePairIndexed, startLaunchpadIndexer } from "./launchpad-indexer.js";
-import { composeCurveAddress, getPublicClient, pairFactoryAddress, vaultFactoryAddress } from "./chain-client.js";
+import {
+  composeCurveAddress,
+  getPublicClient,
+  pairFactoryAddress,
+  ponsLauncherAddress,
+  vaultFactoryAddress,
+} from "./chain-client.js";
+import { startPonsIndexer } from "./pons-indexer.js";
 import { startMarkToMarket } from "./mark-to-market.js";
 import {
   getVaults,
@@ -821,8 +828,12 @@ app.get("/launchpad/pair/:address/history", async (c) => {
 
 // ─── Bonding-curve creator tokens ───────────────────────
 
-/** The ComposeCurve every token read is scoped to ("" when none is configured → nothing matches). */
-const curveScope = () => composeCurveAddress() ?? "";
+/**
+ * Token reads cover every configured venue: the ComposeCurve (tokens quoted in
+ * pair shares) and the PonsLauncher (tokens launched on Pons v2, quoted in one
+ * stock and re-quoted here). An empty list matches nothing.
+ */
+const curveScope = (): string[] => [composeCurveAddress(), ponsLauncherAddress()].filter((a): a is `0x${string}` => !!a);
 
 type PairProfile = Awaited<ReturnType<typeof launchpadStore.getPair>> | null;
 
@@ -1080,6 +1091,7 @@ let server: ServerType;
 let chainListenerCleanup: (() => void) | null = null;
 let launchpadIndexerCleanup: (() => void) | null = null;
 let curveIndexerCleanup: (() => void) | null = null;
+let ponsIndexerCleanup: (() => void) | null = null;
 let vaultDiscoveryCleanup: (() => void) | null = null;
 let markToMarketTimer: NodeJS.Timeout | null = null;
 
@@ -1097,6 +1109,7 @@ server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, async () => {
   chainListenerCleanup = startChainListener();
   launchpadIndexerCleanup = startLaunchpadIndexer();
   curveIndexerCleanup = startCurveIndexer();
+  ponsIndexerCleanup = startPonsIndexer();
   markToMarketTimer = startMarkToMarket();
 });
 
@@ -1111,6 +1124,9 @@ function gracefulShutdown(signal: string) {
   }
   if (curveIndexerCleanup) {
     curveIndexerCleanup();
+  }
+  if (ponsIndexerCleanup) {
+    ponsIndexerCleanup();
   }
   if (vaultDiscoveryCleanup) {
     vaultDiscoveryCleanup();

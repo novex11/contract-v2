@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { boolean, index, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { Db } from "./db.js";
 
@@ -28,6 +28,22 @@ export const curveTokens = pgTable(
     sharePriceUsd: numeric("share_price_usd", { precision: 18, scale: 8 }).notNull().default("1"),
     tradesCount: numeric("trades_count").notNull().default("0"),
     txHash: text("tx_hash").notNull().default(""),
+    /**
+     * Where the token's market lives: "compose" (ComposeCurve, quoted in pair
+     * shares) or "pons" (a Pons v2 bonding curve quoted in one stock / USDG).
+     * For Pons rows the quote-denominated columns above (start/virtual/
+     * graduation quote, trade shares) hold QUOTE units scaled to 18 decimals,
+     * and `sharePriceUsd` holds the quote token's USD price, so every USD
+     * figure downstream is computed the same way for both venues.
+     */
+    venue: text("venue").notNull().default("compose"),
+    /** The Pons bonding curve contract of the token (pons rows only). */
+    ponsCurve: text("pons_curve"),
+    quoteToken: text("quote_token"),
+    quoteSymbol: text("quote_symbol"),
+    quoteDecimals: numeric("quote_decimals").notNull().default("18"),
+    /** The pair's own share price (USD) at the last update — the "two stocks" lens for pons rows. */
+    pairSharePriceUsd: numeric("pair_share_price_usd", { precision: 18, scale: 8 }).notNull().default("1"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -76,6 +92,15 @@ export interface CurveTokenInput {
   sharePriceUsd: number;
   txHash: string;
   createdAt: Date;
+  /** Pons launches only; compose rows leave this undefined. */
+  pons?: {
+    curve: string;
+    quoteToken: string;
+    quoteSymbol: string;
+    quoteDecimals: number;
+    /** The pair's share price (USD) at launch. */
+    pairSharePriceUsd: number;
+  };
 }
 
 export async function recordToken(db: Db, i: CurveTokenInput) {
@@ -99,6 +124,16 @@ export async function recordToken(db: Db, i: CurveTokenInput) {
       startMarketCapUsd: startMarketCapUsd.toFixed(4),
       sharePriceUsd: i.sharePriceUsd.toFixed(8),
       txHash: i.txHash,
+      ...(i.pons
+        ? {
+            venue: "pons",
+            ponsCurve: i.pons.curve.toLowerCase(),
+            quoteToken: i.pons.quoteToken.toLowerCase(),
+            quoteSymbol: i.pons.quoteSymbol,
+            quoteDecimals: String(i.pons.quoteDecimals),
+            pairSharePriceUsd: i.pons.pairSharePriceUsd.toFixed(8),
+          }
+        : {}),
       createdAt: i.createdAt,
       updatedAt: i.createdAt,
     })
@@ -127,6 +162,8 @@ export interface CurveTradeInput {
   txHash: string;
   logIndex: number;
   createdAt: Date;
+  /** Pons trades: the pair's share price (USD) at the trade block. */
+  pairSharePriceUsd?: number;
 }
 
 /** Stores a Trade event once and rolls the token's state forward; null if already indexed. */
@@ -162,6 +199,7 @@ export async function recordTrade(db: Db, i: CurveTradeInput) {
       priceUsd: priceUsd.toFixed(18),
       marketCapUsd: marketCapUsd.toFixed(4),
       sharePriceUsd: i.sharePriceUsd.toFixed(8),
+      ...(i.pairSharePriceUsd != null ? { pairSharePriceUsd: i.pairSharePriceUsd.toFixed(8) } : {}),
       tradesCount: sql`${curveTokens.tradesCount} + 1`,
       updatedAt: new Date(),
     })
@@ -183,11 +221,27 @@ export async function markGraduated(db: Db, tokenAddress: string) {
 // abandoned curve deployment stay in the table but are invisible, which the
 // web renders as "not a Compose creator token".
 
-function curveFilter(curveAddress: string) {
-  return eq(curveTokens.curveAddress, curveAddress.toLowerCase());
+/** One ComposeCurve / PonsLauncher address, or every configured one. */
+export type CurveScope = string | string[];
+
+function curveFilter(scope: CurveScope) {
+  if (Array.isArray(scope)) {
+    const addrs = scope.map((a) => a.toLowerCase());
+    // An empty scope matches nothing, like an unconfigured single address.
+    return addrs.length > 0 ? inArray(curveTokens.curveAddress, addrs) : eq(curveTokens.curveAddress, "");
+  }
+  return eq(curveTokens.curveAddress, scope.toLowerCase());
 }
 
-export async function getToken(db: Db, curveAddress: string, tokenAddress: string) {
+/** Every Pons-launched token row (to bootstrap the Pons indexer's curve set). */
+export async function listPonsTokens(db: Db, launcherAddress: string) {
+  return db
+    .select()
+    .from(curveTokens)
+    .where(and(curveFilter(launcherAddress), eq(curveTokens.venue, "pons")));
+}
+
+export async function getToken(db: Db, curveAddress: CurveScope, tokenAddress: string) {
   const [row] = await db
     .select()
     .from(curveTokens)
@@ -196,7 +250,7 @@ export async function getToken(db: Db, curveAddress: string, tokenAddress: strin
   return row ?? null;
 }
 
-export async function getTokenByPair(db: Db, curveAddress: string, pairAddress: string) {
+export async function getTokenByPair(db: Db, curveAddress: CurveScope, pairAddress: string) {
   const [row] = await db
     .select()
     .from(curveTokens)
@@ -205,7 +259,7 @@ export async function getTokenByPair(db: Db, curveAddress: string, pairAddress: 
   return row ?? null;
 }
 
-export async function listTokensByPair(db: Db, curveAddress: string, pairAddress: string) {
+export async function listTokensByPair(db: Db, curveAddress: CurveScope, pairAddress: string) {
   return db
     .select()
     .from(curveTokens)
@@ -233,7 +287,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * 24h volume per token in one grouped query.
  * Returns a map keyed by lower-cased token address; tokens with no trades are absent.
  */
-export async function volume24hByToken(db: Db, curveAddress: string): Promise<Map<string, number>> {
+export async function volume24hByToken(db: Db, curveAddress: CurveScope): Promise<Map<string, number>> {
   const cutoff = new Date(Date.now() - DAY_MS);
   const rows = await db
     .select({
@@ -252,7 +306,7 @@ export async function volume24hByToken(db: Db, curveAddress: string): Promise<Ma
  * positive token balance, from the indexed trades alone (no balanceOf calls).
  * Transfers outside the curve are not seen, so this is "distinct net buyers".
  */
-export async function holderCounts(db: Db, curveAddress: string): Promise<Map<string, number>> {
+export async function holderCounts(db: Db, curveAddress: CurveScope): Promise<Map<string, number>> {
   const balances = db
     .select({
       tokenAddress: curveTrades.tokenAddress,
@@ -280,7 +334,7 @@ export async function holderCounts(db: Db, curveAddress: string): Promise<Map<st
 /** Tokens of one curve with their 24h volume and holder count, sorted for the launchpad list. */
 export async function listTokens(
   db: Db,
-  curveAddress: string,
+  curveAddress: CurveScope,
   opts: { sort: TokenListSort; limit: number },
 ): Promise<TokenListRow[]> {
   const [volumes, holders] = await Promise.all([volume24hByToken(db, curveAddress), holderCounts(db, curveAddress)]);
@@ -313,7 +367,7 @@ export interface TokenStats {
 }
 
 /** Launchpad header numbers for one curve. */
-export async function getTokenStats(db: Db, curveAddress: string): Promise<TokenStats> {
+export async function getTokenStats(db: Db, curveAddress: CurveScope): Promise<TokenStats> {
   const cutoff = new Date(Date.now() - DAY_MS);
   const [[totals], [vol]] = await Promise.all([
     db
@@ -504,6 +558,9 @@ export function toTokenJson(
   const progressBps = graduation > 0n ? Math.min(10_000, Number((real * 10_000n) / graduation)) : 0;
   const ratio = start > 0n ? (Number(start) + Number(graduation)) / Number(start) : 0;
   const startMarketCapUsd = Number(row.startMarketCapUsd);
+  const isPons = row.venue === "pons";
+  const priceUsd = Number(row.priceUsd);
+  const pairSharePriceUsd = isPons ? Number(row.pairSharePriceUsd) : Number(row.sharePriceUsd);
   return {
     tokenAddress: row.tokenAddress,
     pairAddress: row.pairAddress,
@@ -512,17 +569,36 @@ export function toTokenJson(
     name: row.name,
     symbol: row.symbol,
     graduated: row.graduated,
-    priceUsd: Number(row.priceUsd),
+    priceUsd,
     marketCapUsd: Number(row.marketCapUsd),
     startMarketCapUsd,
     graduationMarketCapUsd: startMarketCapUsd * ratio * ratio,
+    /** Compose rows: the pair share price. Pons rows: the quote token's USD price (see `quotePriceUsd`). */
     sharePriceUsd: Number(row.sharePriceUsd),
     progressBps,
+    /** "compose" (ComposeCurve, pair-share quote) or "pons" (Pons v2 curve, one-stock quote). */
+    venue: isPons ? ("pons" as const) : ("compose" as const),
+    ponsCurve: isPons ? row.ponsCurve : null,
+    quoteToken: isPons ? row.quoteToken : null,
+    quoteSymbol: isPons ? row.quoteSymbol : null,
+    quoteDecimals: isPons ? Number(row.quoteDecimals) : null,
+    /** USD price of the Pons quote token at the last update (null for compose rows). */
+    quotePriceUsd: isPons ? Number(row.sharePriceUsd) : null,
+    /** The pair's own share price (USD); for compose rows this equals `sharePriceUsd`. */
+    pairSharePriceUsd,
+    /** Pair shares per token: the same price re-quoted in the two-stock share. */
+    priceShares: pairSharePriceUsd > 0 ? priceUsd / pairSharePriceUsd : 0,
+    ponsUrl: isPons ? ponsTokenUrl(row.tokenAddress) : null,
     tradesCount: Number(row.tradesCount),
     txHash: row.txHash,
     createdAt: row.createdAt.toISOString(),
     ...extra,
   };
+}
+
+/** The token's page on the Pons site (path pattern not published; the launchpad route with the token address). */
+export function ponsTokenUrl(tokenAddress: string) {
+  return `https://www.ponsfamily.com/launchpad/${tokenAddress.toLowerCase()}`;
 }
 
 export function toTradeJson(row: CurveTradeRow) {

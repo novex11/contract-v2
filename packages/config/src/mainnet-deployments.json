@@ -31,7 +31,10 @@
     "cashbackReserve": "",
     "executionRouter": "",
     "swapAdapter": "",
-    "vaultFactory": ""
+    "vaultFactory": "",
+    "ponsFactory": "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
+    "ponsLauncher": "",
+    "ponsRouter": ""
   },
   "vaults": {},
   "syncedAt": "2026-09-15T22:20:27.002Z"

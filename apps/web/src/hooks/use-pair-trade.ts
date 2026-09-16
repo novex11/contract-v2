@@ -135,7 +135,7 @@ export interface LegQuote {
  * the best output per leg. A reverting candidate means that pool does not
  * exist and is ignored. A leg that needs no swap passes its amount through.
  */
-function useLegQuotes(legs: Array<{ from: Address; to: Address; amount: bigint }> | null) {
+export function useLegQuotes(legs: Array<{ from: Address; to: Address; amount: bigint }> | null) {
   const plan = useMemo(() => {
     if (!legs) return null;
     return legs.map((leg) =>

@@ -36,6 +36,12 @@ export interface TestnetDeployment {
     composeCurve?: string;
     /** Buy/sell creator tokens with ETH or USDG. */
     curveRouter?: string;
+    /** Pons v2 launch factory (external; one-stock quote curves). */
+    ponsFactory?: string;
+    /** Launches a pair's token on Pons v2 (PonsLauncher). */
+    ponsLauncher?: string;
+    /** Trades Pons-launched tokens in pair shares, stocks, USDG or ETH (PonsRouter). */
+    ponsRouter?: string;
     /** Managed baskets (DeployTestnetBaskets) — swap through the oracle-priced router. */
     allocationController?: string;
     cashbackReserve?: string;

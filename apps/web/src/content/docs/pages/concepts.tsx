@@ -330,9 +330,33 @@ export const creatorTokens: DocPage = {
             head={["Network", "Mechanism", "Status"]}
             rows={[
               ["Testnet (46630) and mainnet (4663)", <>Compose bonding curve: 1 B supply on a constant-product curve quoted in the pair share, via <C>ComposeCurve</C> and <C>CurveRouter</C></>, <Pill key="1" tone="accent">live</Pill>],
+              ["Mainnet (4663), Pons venue", <>Pons v2 bonding curve quoted in one of the pair&apos;s stocks (or USDG), launched through <C>PonsLauncher</C> and traded through <C>PonsRouter</C></>, <Pill key="3" tone="accent">live</Pill>],
               ["Mainnet (4663), terminal-visible path", "Doppler Airlock launch with the pair share as numeraire; price discovery in a v4 hook, then migration to a Uniswap v4 pool", <Pill key="2" tone="gold">planned</Pill>],
             ]}
           />
+        </>
+      ),
+    },
+    {
+      id: "pons-venue",
+      title: "The Pons venue",
+      keywords: ["pons", "one-stock quote", "ponsfamily", "shared market"],
+      body: (
+        <>
+          <p>
+            A pair creator can launch the pair&apos;s token on Pons v2 instead of the Compose curve. The token keeps the
+            pair&apos;s name and symbol, but its market is a Pons bonding curve quoted in one of the pair&apos;s two stocks
+            (or USDG). It is listed on ponsfamily.com from the launch block. The creator&apos;s share of the 1% curve fee
+            (70%, plus any creator tax) accrues on the curve; the creator sweeps it into Pons&apos;s fee escrow and claims
+            it from the token page. Only the creator&apos;s wallet can do either.
+          </p>
+          <p>
+            There is one market, not two. Every Compose trade on such a token is routed onto the same Pons curve by{" "}
+            <C>PonsRouter</C>, whether it is paid in ETH, USDG, the quote stock or the pair&apos;s shares. Compose shows the
+            Pons price re-quoted in USD and in pair shares, so price and volume match on both sites by construction.
+            Launching costs Pons&apos;s 0.0005 ETH launch fee; Pons taxes buys in the first three seconds after launch
+            (99% decaying to zero), with the creator and up to 32 wallets the creator lists at launch exempt.
+          </p>
         </>
       ),
     },

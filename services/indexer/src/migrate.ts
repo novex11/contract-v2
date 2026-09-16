@@ -305,6 +305,14 @@ export async function ensureSchema(): Promise<void> {
       // curve deployments keep '' and drop out of every read.
       await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS curve_address text NOT NULL DEFAULT ''`;
       await sql`CREATE INDEX IF NOT EXISTS curve_tokens_curve_idx ON curve_tokens (curve_address)`;
+      // Pons v2 launches share the table: venue + quote-asset columns (see curve-store.ts).
+      await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS venue text NOT NULL DEFAULT 'compose'`;
+      await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS pons_curve text`;
+      await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS quote_token text`;
+      await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS quote_symbol text`;
+      await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS quote_decimals numeric NOT NULL DEFAULT '18'`;
+      await sql`ALTER TABLE curve_tokens ADD COLUMN IF NOT EXISTS pair_share_price_usd numeric(18, 8) NOT NULL DEFAULT '1'`;
+      await sql`CREATE INDEX IF NOT EXISTS curve_tokens_pons_curve_idx ON curve_tokens (pons_curve)`;
       await sql`
         CREATE TABLE IF NOT EXISTS curve_trades (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

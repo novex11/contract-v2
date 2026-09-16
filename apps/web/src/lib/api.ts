@@ -395,6 +395,29 @@ export interface CurveToken {
   volume24hUsd?: number;
   /** Distinct wallets holding the token (indexer estimate). */
   holders?: number;
+  /**
+   * Where the token's market lives: the Compose bonding curve (default) or a
+   * Pons v2 curve quoted in one of the pair's stocks. Pons tokens carry the
+   * quote asset, its USD price and the same price re-quoted in pair shares.
+   */
+  venue?: TokenVenue;
+  ponsCurve?: string;
+  quoteToken?: string;
+  quoteSymbol?: string;
+  quoteDecimals?: number;
+  quotePriceUsd?: number;
+  pairSharePriceUsd?: number;
+  /** Pair shares per token (the two-stock lens on the Pons price). */
+  priceShares?: number;
+  /** The token's page on ponsfamily.com. */
+  ponsUrl?: string;
+}
+
+export type TokenVenue = "compose" | "pons";
+
+/** A missing venue means the Compose curve (tokens indexed before Pons support). */
+export function isPonsToken(t: Pick<CurveToken, "venue"> | null | undefined): boolean {
+  return t?.venue === "pons";
 }
 
 export type CurveTokenSort = "new" | "mcap" | "volume";

@@ -11,8 +11,11 @@ import { receiptTokenAbi } from "@/lib/contracts";
 import { useWallet } from "@/hooks/use-wallet";
 import { useOraclePrices, usePairOnchain } from "@/hooks/use-pair-launchpad";
 import { useCurveOnchain, useCurveTokenDetail, useTokenHistory, useTokenLive } from "@/hooks/use-curve-token";
+import { ponsTokenUrl, usePonsOnchain } from "@/hooks/use-pons-token";
 import { PairAreaChart, type PairAreaMetric } from "@/components/pair/pair-area-chart";
 import { TokenTradePanel } from "@/components/token/token-trade-panel";
+import { PonsTradePanel } from "@/components/token/pons-trade-panel";
+import { PonsCreatorFees } from "@/components/token/pons-creator-fees";
 import { CurveCreatorFees } from "@/components/token/curve-creator-fees";
 import { AddressChip } from "@/components/launchpad/address-chip";
 import { DualLogoStack } from "@/components/launchpad/dual-logo-stack";
@@ -59,11 +62,20 @@ export default function TokenDetailContent({ address }: { address: string }) {
   const detail = useCurveTokenDetail(token);
   const onchain = useCurveOnchain(token);
   const curve = onchain.data;
-  const pairChain = usePairOnchain(curve?.pair);
+  // A token launched on Pons v2 has no ComposeCurve entry; its market is read through PonsRouter.
+  const ponsChain = usePonsOnchain(token);
+  const pons = ponsChain.data ?? undefined;
+  const market = pons
+    ? { pair: pons.pair, creator: pons.creator, launchTime: pons.launchTime }
+    : curve
+      ? { pair: curve.pair, creator: curve.creator, launchTime: curve.launchTime }
+      : undefined;
+  const pairChain = usePairOnchain(market?.pair);
   const chain = pairChain.data;
   const history = useTokenHistory(token, range);
   const live = useTokenLive(token, () => {
     void onchain.refetch();
+    void ponsChain.refetch();
     void pairChain.refetch();
   });
 
@@ -102,20 +114,29 @@ export default function TokenDetailContent({ address }: { address: string }) {
   const priceA8 = chain ? prices.get(chain.tokenA.toLowerCase()) : undefined;
   const priceB8 = chain ? prices.get(chain.tokenB.toLowerCase()) : undefined;
 
-  const marketCapUsd = curve ? Number(curve.marketCapUsd8) / 1e8 : (meta?.marketCapUsd ?? 0);
+  const marketCapUsd = pons
+    ? Number(pons.marketCapUsd8) / 1e8
+    : curve
+      ? Number(curve.marketCapUsd8) / 1e8
+      : (meta?.marketCapUsd ?? 0);
   const priceUsd = marketCapUsd / SUPPLY;
-  const progressBps = curve?.progressBps ?? meta?.progressBps ?? 0;
-  const graduated = curve?.graduated ?? meta?.graduated ?? false;
+  const progressBps = pons?.progressBps ?? curve?.progressBps ?? meta?.progressBps ?? 0;
+  const graduated = pons?.graduated ?? curve?.graduated ?? meta?.graduated ?? false;
   const graduationMcap = meta?.graduationMarketCapUsd;
   const toGraduation = graduationMcap ? Math.max(0, graduationMcap - marketCapUsd) : undefined;
+  // The Pons price seen through the two-stock lens: pair shares and quote stock per token.
+  const quoteSym = pons?.quoteSymbol || meta?.quoteSymbol || "quote";
+  const priceShares = pons ? Number(formatUnits(pons.priceInShares, 18)) : meta?.priceShares;
+  const priceQuote = pons ? Number(formatUnits(pons.priceInQuote, pons.quoteDecimals)) : undefined;
+  const ponsUrl = meta?.ponsUrl ?? (token ? ponsTokenUrl(token) : "");
 
   if (!token) {
     return <div className="container-page py-12 text-sm text-muted-foreground">That is not a valid token address.</div>;
   }
-  if (onchain.isLoading) {
+  if (onchain.isLoading || ponsChain.isLoading) {
     return <div className="container-page py-12 text-sm text-muted-foreground">Loading token…</div>;
   }
-  if (!curve) {
+  if (!market) {
     return (
       <div className="container-page py-12 text-sm text-muted-foreground">
         This address is not a Compose creator token on this network.
@@ -155,7 +176,7 @@ export default function TokenDetailContent({ address }: { address: string }) {
           <div>
             <p className="label-caps flex items-center gap-2">
               <RocketLaunch size={12} weight="fill" />
-              Creator token · bonding curve
+              {pons ? `Creator token · Pons v2 curve · quoted in ${quoteSym}` : "Creator token · bonding curve"}
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">{name}</h1>
             <p className="mt-1 font-mono text-sm text-muted-foreground">${symbol}</p>
@@ -169,9 +190,23 @@ export default function TokenDetailContent({ address }: { address: string }) {
                 {tickerA} + {tickerB}
               </span>
             </p>
+            {pons && (
+              <p className="mt-1 font-mono text-xs text-muted-foreground">
+                1 {symbol} = {priceShares !== undefined ? formatSmall(priceShares) : "—"} {tickerA}+{tickerB} shares ={" "}
+                {priceQuote !== undefined ? formatSmall(priceQuote) : "—"} {quoteSym} · one market, shown two ways
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {pons && (
+            <a href={ponsUrl} target="_blank" rel="noopener noreferrer" title="This token's page on Pons">
+              <Badge variant="outline">
+                Live on Pons
+                <ArrowSquareOut size={12} />
+              </Badge>
+            </a>
+          )}
           {graduated ? (
             <Badge variant="success">
               <GraduationCap size={12} weight="fill" />
@@ -191,8 +226,9 @@ export default function TokenDetailContent({ address }: { address: string }) {
           {isTestnetMode() ? "Robinhood Chain Testnet" : "Robinhood Chain"}
         </span>
         <AddressChip address={token} label="Token" />
-        <AddressChip address={curve.pair} label="Pair" />
-        <AddressChip address={curve.creator} label="Creator" />
+        <AddressChip address={market.pair} label="Pair" />
+        <AddressChip address={market.creator} label="Creator" />
+        {pons && <AddressChip address={pons.curve} label="Pons curve" />}
       </div>
 
       {/* Bonding progress */}
@@ -210,11 +246,17 @@ export default function TokenDetailContent({ address }: { address: string }) {
           />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          {graduated
-            ? "This token reached its graduation target. Trading continues on the curve."
-            : toGraduation !== undefined
-              ? `${formatUsd(toGraduation)} more market cap to graduate at ≈ ${formatUsd(graduationMcap!)}. Every buy adds ${tickerA} + ${tickerB} to the pair vault.`
-              : "Every buy adds stock-backed pair shares to the curve reserve."}
+          {pons
+            ? graduated
+              ? "This token graduated on Pons: its liquidity moved into a locked Uniswap pool. Trade it on Pons."
+              : toGraduation !== undefined
+                ? `${formatUsd(toGraduation)} more market cap to graduate at ≈ ${formatUsd(graduationMcap!)}. Every buy adds ${quoteSym} to the Pons curve.`
+                : `Every buy adds ${quoteSym} to the Pons curve; once it sells out, liquidity moves into a locked Uniswap pool on Pons.`
+            : graduated
+              ? "This token reached its graduation target. Trading continues on the curve."
+              : toGraduation !== undefined
+                ? `${formatUsd(toGraduation)} more market cap to graduate at ≈ ${formatUsd(graduationMcap!)}. Every buy adds ${tickerA} + ${tickerB} to the pair vault.`
+                : "Every buy adds stock-backed pair shares to the curve reserve."}
         </p>
       </section>
 
@@ -223,7 +265,7 @@ export default function TokenDetailContent({ address }: { address: string }) {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-sm font-semibold">Backing</p>
           <Link
-            href={`/pair/${curve.pair}`}
+            href={`/pair/${market.pair}`}
             className="font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             Creator vault ↗
@@ -243,8 +285,9 @@ export default function TokenDetailContent({ address }: { address: string }) {
           <BackingStat label="Vault TVL" value={chain ? formatUsd(Number(chain.navUsd8) / 1e8) : "—"} sub="real stocks, redeemable" />
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Every buy adds {tickerA} + {tickerB} to this vault and every sell takes them back out. Only the creator can
-          deposit into it directly.
+          {pons
+            ? `The token's curve reserve is ${quoteSym} on Pons. This vault backs the ${tickerA}+${tickerB} shares you can pay with or receive; buying with shares redeems them into the quote, selling for shares deposits it back.`
+            : `Every buy adds ${tickerA} + ${tickerB} to this vault and every sell takes them back out. Only the creator can deposit into it directly.`}
         </p>
       </section>
 
@@ -340,18 +383,46 @@ export default function TokenDetailContent({ address }: { address: string }) {
 
         <aside className="lg:col-span-5">
           <div className="lg:sticky lg:top-24">
-            {wallet.address && wallet.address.toLowerCase() === curve.creator.toLowerCase() && (
-              <CurveCreatorFees
-                className="mb-4"
-                token={token}
-                pair={curve.pair}
-                symbol={symbol}
-                owedShares={curve.creatorFees}
-                sharePriceUsd={chain ? Number(chain.sharePriceUsd8) / 1e8 : meta?.sharePriceUsd}
-                onClaimed={() => void onchain.refetch()}
-              />
+            {wallet.address && wallet.address.toLowerCase() === market.creator.toLowerCase() && (
+              pons ? (
+                <PonsCreatorFees className="mb-4" pons={pons} symbol={symbol} ponsUrl={ponsUrl} />
+              ) : curve ? (
+                <CurveCreatorFees
+                  className="mb-4"
+                  token={token}
+                  pair={curve.pair}
+                  symbol={symbol}
+                  owedShares={curve.creatorFees}
+                  sharePriceUsd={chain ? Number(chain.sharePriceUsd8) / 1e8 : meta?.sharePriceUsd}
+                  onClaimed={() => void onchain.refetch()}
+                />
+              ) : null
             )}
-            {chain ? (
+            {chain && pons ? (
+              <PonsTradePanel
+                token={token}
+                pair={pons.pair}
+                symbol={symbol}
+                chain={chain}
+                pons={pons}
+                tickerA={tickerA}
+                tickerB={tickerB}
+                decA={tokenAMeta?.decimals ?? 18}
+                decB={tokenBMeta?.decimals ?? 18}
+                priceA8={priceA8}
+                priceB8={priceB8}
+                account={wallet.address}
+                authenticated={wallet.authenticated}
+                walletReady={wallet.ready}
+                onLogin={wallet.login}
+                onDone={() => {
+                  void ponsChain.refetch();
+                  void pairChain.refetch();
+                  void detail.refetch();
+                  void history.refetch();
+                }}
+              />
+            ) : chain && curve ? (
               <TokenTradePanel
                 token={token}
                 pair={curve.pair}
@@ -381,14 +452,32 @@ export default function TokenDetailContent({ address }: { address: string }) {
               </div>
             )}
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-muted-foreground">
-              1B fixed supply, all of it on the curve at launch. Price follows a constant-product bonding curve quoted in{" "}
-              {tickerA}+{tickerB} pair shares, so the reserve is real stocks. 1% trade fee: 70% creator, 30% protocol.
+              {pons ? (
+                <>
+                  1B fixed supply on a Pons v2 constant-product curve quoted in {quoteSym}. The same curve is listed on
+                  ponsfamily.com; Compose routes every trade onto it and re-quotes the price in {tickerA}+{tickerB} pair
+                  shares. 1% curve fee, with the creator&apos;s share paid by Pons directly.
+                </>
+              ) : (
+                <>
+                  1B fixed supply, all of it on the curve at launch. Price follows a constant-product bonding curve quoted in{" "}
+                  {tickerA}+{tickerB} pair shares, so the reserve is real stocks. 1% trade fee: 70% creator, 30% protocol.
+                </>
+              )}
             </p>
           </div>
         </aside>
       </div>
     </div>
   );
+}
+
+/** Small unit prices (shares or stock per token) without scientific notation. */
+function formatSmall(n: number): string {
+  if (n === 0) return "0";
+  if (n >= 0.01) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const exp = Math.floor(Math.log10(n));
+  return n.toFixed(Math.min(12, -exp + 3));
 }
 
 function formatReserve(amount: bigint, decimals: number): string {

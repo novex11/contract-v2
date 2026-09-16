@@ -80,6 +80,30 @@ export function composeCurveAddress(): `0x${string}` | undefined {
   return isHexAddress(value) ? value : undefined;
 }
 
+/** PonsLauncher (pair tokens launched on Pons v2); the synced deployment file, env override on mainnet. */
+export function ponsLauncherAddress(): `0x${string}` | undefined {
+  const value = USE_TESTNET
+    ? testnetDeployment().contracts.ponsLauncher
+    : mainnetAddress(
+        process.env.PONS_LAUNCHER_ADDRESS,
+        process.env.NEXT_PUBLIC_PONS_LAUNCHER_ADDRESS,
+        mainnetDeployment().contracts.ponsLauncher,
+      );
+  return isHexAddress(value) ? value : undefined;
+}
+
+/** PonsRouter (trade Pons-launched tokens in pair shares / stocks / USDG / ETH). */
+export function ponsRouterAddress(): `0x${string}` | undefined {
+  const value = USE_TESTNET
+    ? testnetDeployment().contracts.ponsRouter
+    : mainnetAddress(
+        process.env.PONS_ROUTER_ADDRESS,
+        process.env.NEXT_PUBLIC_PONS_ROUTER_ADDRESS,
+        mainnetDeployment().contracts.ponsRouter,
+      );
+  return isHexAddress(value) ? value : undefined;
+}
+
 /**
  * VaultFactory (managed baskets): the synced deployment file on testnet, env
  * override on mainnet.

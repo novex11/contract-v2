@@ -1626,6 +1626,10 @@ function SuccessScreen({
           seeded on Robinhood Chain. Your seed minted receipts at $1.00 per
           share.
         </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Next, launch the pair&apos;s token from the pair page: on the Compose curve, or on Pons v2 quoted in one of
+          its stocks.
+        </p>
         {notice && (
           <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
             <p>{notice}</p>

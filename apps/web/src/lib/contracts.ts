@@ -20,6 +20,11 @@ import oracleSwapRouterAbiJson from "./abis/OracleSwapRouter.json";
 import testUsdgAbiJson from "./abis/TestUSDG.json";
 import composeCurveAbiJson from "./abis/ComposeCurve.json";
 import curveRouterAbiJson from "./abis/CurveRouter.json";
+import ponsLauncherAbiJson from "./abis/PonsLauncher.json";
+import ponsRouterAbiJson from "./abis/PonsRouter.json";
+import ponsV2LaunchFactoryAbiJson from "./abis/PonsV2LaunchFactory.json";
+import ponsV2BondingCurveAbiJson from "./abis/PonsV2BondingCurve.json";
+import ponsV2FeeEscrowAbiJson from "./abis/PonsV2FeeEscrow.json";
 
 export const strategyVaultAbi = strategyVaultAbiJson as Abi;
 export const receiptTokenAbi = receiptTokenAbiJson as Abi;
@@ -33,6 +38,12 @@ export const oracleSwapRouterAbi = oracleSwapRouterAbiJson as Abi;
 export const testUsdgAbi = testUsdgAbiJson as Abi;
 export const composeCurveAbi = composeCurveAbiJson as Abi;
 export const curveRouterAbi = curveRouterAbiJson as Abi;
+export const ponsLauncherAbi = ponsLauncherAbiJson as Abi;
+export const ponsRouterAbi = ponsRouterAbiJson as Abi;
+export const ponsV2LaunchFactoryAbi = ponsV2LaunchFactoryAbiJson as Abi;
+export const ponsV2BondingCurveAbi = ponsV2BondingCurveAbiJson as Abi;
+/** Pons's shared fee escrow: swept creator fees wait here until the creator claims them. */
+export const ponsV2FeeEscrowAbi = ponsV2FeeEscrowAbiJson as Abi;
 
 /** ERC-20 subset used across the app. */
 export const erc20Abi = [
@@ -131,6 +142,21 @@ export const CURVE_ROUTER_ADDRESS = testnet
   ? addr(testnet.contracts.curveRouter)
   : pick(process.env.NEXT_PUBLIC_CURVE_ROUTER_ADDRESS, mainnet?.contracts.curveRouter);
 
+/**
+ * Pons v2 integration: the external Pons launch factory, our PonsLauncher (launches a
+ * pair's token on Pons with one of its stocks as the quote) and PonsRouter (trades
+ * those tokens in pair shares, the quote stock, USDG or ETH on the same Pons curve).
+ */
+export const PONS_FACTORY_ADDRESS = testnet
+  ? addr(testnet.contracts.ponsFactory)
+  : pick(process.env.NEXT_PUBLIC_PONS_FACTORY_ADDRESS, mainnet?.contracts.ponsFactory);
+export const PONS_LAUNCHER_ADDRESS = testnet
+  ? addr(testnet.contracts.ponsLauncher)
+  : pick(process.env.NEXT_PUBLIC_PONS_LAUNCHER_ADDRESS, mainnet?.contracts.ponsLauncher);
+export const PONS_ROUTER_ADDRESS = testnet
+  ? addr(testnet.contracts.ponsRouter)
+  : pick(process.env.NEXT_PUBLIC_PONS_ROUTER_ADDRESS, mainnet?.contracts.ponsRouter);
+
 /** Managed baskets: VaultFactory from the synced deployment (testnet swaps through the oracle-priced router). */
 export const FACTORY_ADDRESS = testnet
   ? addr(testnet.contracts.vaultFactory)
@@ -172,6 +198,8 @@ export const swapQuotesReady = pairRouterReady && SWAP_QUOTER_ADDRESS !== ZERO;
 /** Creator tokens can be launched and traded on this network. */
 export const composeCurveReady = COMPOSE_CURVE_ADDRESS !== ZERO;
 export const curveRouterReady = composeCurveReady && CURVE_ROUTER_ADDRESS !== ZERO && pairRouterReady;
+export const ponsLauncherReady = PONS_FACTORY_ADDRESS !== ZERO && PONS_LAUNCHER_ADDRESS !== ZERO && pairFactoryReady;
+export const ponsRouterReady = ponsLauncherReady && PONS_ROUTER_ADDRESS !== ZERO && pairRouterReady;
 
 /** Factory deployed — resolves basket vaults per deposit asset (tTSLA-B, etc.) */
 export const factoryReady = FACTORY_ADDRESS !== ZERO;

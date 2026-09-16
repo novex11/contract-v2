@@ -646,6 +646,14 @@ export default function PairDetailContent({ address }: { address: string }) {
               imageUrl={meta?.imageUrl}
               displayName={displayName}
               symbol={symbol}
+              tokenA={chain.tokenA}
+              tokenB={chain.tokenB}
+              tickerA={tickerA}
+              tickerB={tickerB}
+              decA={tokenAMeta?.decimals ?? 18}
+              decB={tokenBMeta?.decimals ?? 18}
+              description={meta?.description}
+              websiteUrl={meta?.websiteUrl}
             />
             {isCreator && (
               <CreatorRewards

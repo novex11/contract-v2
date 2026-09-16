@@ -265,14 +265,21 @@ function TokenCard({ token, delay }: { token: CurveToken; delay: number }) {
                 </p>
               </div>
             </div>
-            {token.graduated ? (
-              <Badge variant="success">
-                <GraduationCap size={11} weight="fill" />
-                Graduated
-              </Badge>
-            ) : (
-              <Badge variant="accent">{progress.toFixed(0)}%</Badge>
-            )}
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {token.graduated ? (
+                <Badge variant="success">
+                  <GraduationCap size={11} weight="fill" />
+                  Graduated
+                </Badge>
+              ) : (
+                <Badge variant="accent">{progress.toFixed(0)}%</Badge>
+              )}
+              {token.venue === "pons" && (
+                <Badge variant="outline" title={token.quoteSymbol ? `Quoted in ${token.quoteSymbol} on Pons` : "Live on Pons"}>
+                  Pons{token.quoteSymbol ? ` · ${token.quoteSymbol}` : ""}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="mt-4 flex items-baseline justify-between">

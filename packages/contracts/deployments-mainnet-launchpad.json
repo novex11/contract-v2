@@ -11,7 +11,10 @@
     "pairRouter": "0x67B32aFf036461e41392C2d6985a5b82965f8Eb1",
     "priceFeedUpdater": "0x538C10dC06450819E8E9eb552c87bF17cFBab702",
     "swapRouter": "0xCaf681a66D020601342297493863E78C959E5cb2",
-    "usdg": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+    "usdg": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+    "ponsFactory": "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
+    "ponsLauncher": "",
+    "ponsRouter": ""
   },
   "curveStartMarketCapUsd8": 345000000000,
   "feeds": {
